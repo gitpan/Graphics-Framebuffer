@@ -1,0 +1,11 @@
+Revision history for Graphics-Framebuffer
+
+1.00    2004
+        First version, released privately only, as part of a Perl
+		media player project called "SuperSparky".
+
+4.02    Dec 29, 2013
+        Public CPAN release.  This is considerably more advanced
+		than the one distributed as part of the media player.
+
+
