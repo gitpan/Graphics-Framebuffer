@@ -38,7 +38,7 @@ use Imager;         # This is used for TrueType font printing.
 BEGIN {
     require Exporter;
     # set the version for version checking
-    our $VERSION   = 4.02;
+    our $VERSION   = 4.03;
     # Inherit from Exporter to export functions and variables
     our @ISA       = qw(Exporter);
     # Functions and variables which are exported by default
@@ -1452,7 +1452,7 @@ modify it under the same terms as Perl itself.
 
 =head1 VERSION
 
-Version 4.01 (July 21, 2013)
+Version 4.04 (March 20, 2014)
 
 =cut
 

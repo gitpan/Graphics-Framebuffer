@@ -1,22 +1,22 @@
 #!/usr/bin/perl
 
-$| = 1;
+# This tests the various methods of the Graphics::Framebuffer module
+# and shows the only way threads will work with it.
 
 use strict;
 use Switch;
 
 use threads;
-# use Data::Dumper::Simple;
 use Graphics::Framebuffer;
 
 my @framebuffer;
-my $Threads = 4; # Yep, threads can be used... carefully.
+my $Threads = 4;
 foreach my $thr (1..$Threads) {
     push(@framebuffer,Graphics::Framebuffer->new());
 }
 my $screen_width = $framebuffer[0]->{'XRES'};
 my $screen_height = $framebuffer[0]->{'YRES'};
-# print STDERR Dumper($framebuffer),"\n";
+
 $framebuffer[0]->cls();
 my $cls = int(rand($screen_width));
 foreach my $page (1..$Threads) {
@@ -33,7 +33,6 @@ foreach my $page (1..$Threads) {
 while(1) {
     threads->yield();
 }
-
 
 
 ##############################################################################
@@ -100,29 +99,6 @@ sub attract {
     }
     $framebuffer[$Page]->clip_reset();
     return($Page);
-}
-
-##############################################################################
-##                DEBUGGING AND MANUALLY EXECUTED ROUTINES                  ##
-##############################################################################
-# These routines are mainly used for debugging and ordinary coding purposes. #
-# Some are not called unless coded into the system, and therefore are        #
-# orphans during normal operation.                                           #
-##############################################################################
-
-sub chars {
-    my $counter = 0;
-    blank_screen();
-    locate(1,1);
-    for (my $count=129;$count<255;$count++) {
-        print chr(9) . "$count:" . chr($count);
-        if ($counter == 4) {
-            print "\n";
-            $counter = 0;
-        } else {
-            $counter++;
-        }
-    }
 }
 
 __END__
