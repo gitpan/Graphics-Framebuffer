@@ -1,49 +1,67 @@
 package Graphics::Framebuffer;
 
+=head1 NAME
+
+Graphics::Framebuffer
+
+=head1 SYNOPSIS
+
+ use Graphics::Framebuffer;
+
+ my $fb = Graphics::Framebuffer->new();
+
+ $fb->cls();
+ $fb->set_color({'red' => 255, 'green' => 255, 'blue' => 255});
+ $fb->plot({'x' => 28, 'y' => 79,'pixel_size' => 1});
+ $fb->drawto({'x' => 405,'y' => 681,'pixel_size' => 1});
+ $fb->circle({'x' => 200, 'y' => 200, 'radius' => 100, 'filled' => 1});
+
+ $fb->close_screen();
+
+=head1 DESCRIPTION
+
+A (mostly) Pure Perl graphics library for exclusive use in a console framebuffer
+environment.  It is written for simplicity without the need for complex API's
+and drivers.
+
+Back in the old days, computers drew graphics this way, and it was simple and
+easy to do.  I was writing a console based media playing program, and was not
+satisfied with the limited abilities offered by the Curses library, and I did
+not want the overhead of the X environment to get in the way.  My intention
+was to create a mobile media server.  In case you are wondering, that project
+has been quite successful, and I am still making improvements to it.
+
+There are places where Pure Perl just won't cut it.  So I use the Imager
+library to take up the slack.  It's just used to load and save images, and
+draw TrueType text.
+
+I cannot guarantee this will work on your video card, but I have successfully
+tested it on NVidia GeForce, AMD Radeon, Matrox,  and VirtualBox displays.
+However, you MUST remember, your video driver MUST be framebuffer based.  The
+proprietary Nvidia and AMD drivers will NOT work with this module.  You must use
+the open source video drivers, such as Nouveau, to be able to use this library.
+Also, it is not going to work from within X, so don't even try it.  This is a
+console only graphics library.
+
+I highly suggest you use 32 bit mode and avoid 16 bit, as it has been a long time
+since I tested it on a 16 bit graphics mode.
+
+=cut
+
 use strict;
 no strict 'vars';
 use 5.014;
 use Switch; # Yes, a touch of new Perl.
 use Math::Trig qw(:pi);
-
-##########################################################
-##       PURE PERL 16/32 bit GRAPHICS ROUTINES          ##
-##########################################################
-#            Copyright 2004 Richard Kelsch               #
-#                All Rights Reserved                     #
-##########################################################
-
-# Currently, I cannot multithread these objects, as it breaks the memory mapping
-# of the framebuffer and $SCREEN variable, due to how Perl copies all variables.
-# Using Threads::shared doesn't work either.  I have some ideas to implement
-# threading to speed things up a bit.  Nevertheless, these routines are pretty
-# fast considering they are all interpreted and not compiled, and single-threaded.
-
-# I cannot guarantee this will work on your video card, but I have successfully
-# tested it on NVidia GeForce, AMD Radeon, Matrox,  and VirtualBox displays.
-# However, you MUST remember, your video driver MUST be framebuffer based.  The
-# proprietary Nvidia and AMD drivers will NOT work with this module.  You must use
-# the open source video drivers, such as Nouveau, to be able to use this library.
-# Also, it is not going to work from within X, so don't even try it.  This is a
-# console only graphics library.
-
-# I highly suggest you use 32 bit mode and avoid 16 bit, as it has been a long time
-# since I tested it on a 16 bit graphics mode.
-
 use Sys::Mmap;      # Absolutely necessary to map the screen to a string.
 use Imager;         # This is used for TrueType font printing.
-# use Imager::Fill; # Not used yet, but coming soon.
-# use Data::Dumper::Simple; # I use this for debugging.
 
 BEGIN {
     require Exporter;
     # set the version for version checking
-    our $VERSION   = 4.03;
-    # Inherit from Exporter to export functions and variables
+    our $VERSION   = 4.05;
     our @ISA       = qw(Exporter);
-    # Functions and variables which are exported by default
     our @EXPORT    = qw();
-    # Functions and variables which can be optionally exported
     our @EXPORT_OK = qw();
 }
 
@@ -52,11 +70,24 @@ DESTROY {
     $self->screen_close();
 }
 
+=head1 METHODS
+
+=head2 new
+
+This instantiates the framebuffer object
+
+=over 1
+
+my $fb = Graphics::Framebuffer->new();
+
+=back
+=cut
 sub new {
     my $class = shift;
-    my @dummy; # Just a temporary generic array for excess data returned from get_info
+    my @dummy; # Just a temporary generic array for excess data returned from _get_info
     my $self  = {
-	'SCREEN'      => '',
+        'SCREEN'      => '',
+
         # Set up the user defined graphics primitives and attributes default values
         'I_COLOR'     => undef,
         'X'           => 0,
@@ -115,7 +146,7 @@ sub new {
         $self->{'sync'},
         $self->{'vmode'},
         @dummy
-    ) = get_info($self->{'FBIOGET_VSCREENINFO'},$self->{'FBioget_vscreeninfo'},$self->{'FB'});
+    ) = _get_info($self->{'FBIOGET_VSCREENINFO'},$self->{'FBioget_vscreeninfo'},$self->{'FB'});
 
     (
         $self->{'id'},
@@ -132,7 +163,7 @@ sub new {
         $self->{'mmio_len'},
         $self->{'accel'},
         @dummy
-    ) = get_info($self->{'FBIOGET_FSCREENINFO'},$self->{'FBioget_fscreeninfo'},$self->{'FB'});
+    ) = _get_info($self->{'FBIOGET_FSCREENINFO'},$self->{'FBioget_fscreeninfo'},$self->{'FB'});
     $self->{'VXRES'}          = $self->{'xres_virtual'};
     $self->{'VYRES'}          = $self->{'yres_virtual'};
     $self->{'XRES'}           = $self->{'xres'};
@@ -154,34 +185,60 @@ sub new {
 
     return $self;
 }
+###############################################################
+
+=head2 screen_close
+
+Unmaps the SCREEN and closes the framebuffer.  This is usually
+automatically called when the object is destroyed.
+
+=over 1
+
+$fb->screen_close();
+
+=back
+=cut
 sub screen_close {
-    ##########################################################
-    ##                     SCREEN CLOSE                      #
-    ##########################################################
-    # Unmaps SCREEN and closes the framebuffer               #
-    ##########################################################
     my $self = shift;
     munmap($self->{'SCREEN'}) if (defined($self->{'SCREEN'}));
     close($self->{'FB'}) if (defined($self->{'FB'}));
     delete($self->{'SCREEN'});
     delete($self->{'FB'});
 }
+###############################################################
+
+=head2 screen_dimensions
+
+Returns the size of the framebuffer is X,Y pixel values.
+
+=over 1
+
+my ($width,$height) = $fb->screen_dimensions();
+
+=back
+=cut
 sub screen_dimensions {
-    ##########################################################
-    ##                   SCREEN DIMENSIONS                  ##
-    ##########################################################
-    # Returns the size of the framebuffer in X,Y pixel       #
-    # values.                                                #
-    ##########################################################
     my $self = shift;
     return($self->{'xres'},$self->{'yres'});
 }
+
+=head2 draw_mode
+
+Sets or returns the drawing mode, depending on how it is called.
+
+=over 1
+
+ my $draw_mode = $fb->draw_mode();
+
+ $fb->draw_mode($fb->{'NORMAL_MODE'});
+ $fb->draw_mode($fb->{'XOR_MODE'});
+ $fb->draw_mode($fb->{'OR_MODE'});
+ $fb->draw_mode($fb->{'AND_MODE'});
+ $fb->draw_mode($fb->{'MASK_MODE'});
+
+=back
+=cut
 sub draw_mode {
-    ##########################################################
-    ##                      DRAW MODE                       ##
-    ##########################################################
-    # Sets or returns the drawing mode.                      #
-    ##########################################################
     my $self = shift;
     if (@_) {
         $self->{'DRAW_MODE'} = int(shift);
@@ -189,27 +246,52 @@ sub draw_mode {
         return($self->{'DRAW_MODE'});
     }
 }
+
+=head2 clear_screen
+
+Fills the entire screen with the background color
+
+=over 1
+
+$fb->clear_screen();
+
+=back
+=cut
 sub clear_screen {
-    ##########################################################
-    ##                     CLEAR SCREEN                     ##
-    ##########################################################
     # Fills the entire screen with the background color fast #
-    ##########################################################
     my $self = shift;
     $self->blit_write({'x' => 0,'y' => 0,'width' => $self->{'XRES'},'height' => $self->{'YRES'},'image' => chr(0) x $self->{'SIZE'}},0);
 }
+
+=head2 cls
+
+The same as clear_screen
+
+=over 1
+
+$fb->cls();
+
+=back
+=cut
 sub cls {
     my $self = shift;
     $self->clear_screen();
 }
+
+=head2 attribute_reset
+
+Resets the plot point at 0,0.  Resets clipping to the current
+screen size.  Resets the global color to white and resets the
+drawing mode to NORMAL.
+
+=over 1
+
+$fb->attribute_reset();
+
+=back
+=cut
+
 sub attribute_reset {
-    ##########################################################
-    ##                    ATTRIBUTE RESET                   ##
-    ##########################################################
-    # Resets the plot point at 0,0.  Resets clipping the     #
-    # current screen size.  Resets the global color to white #
-    # Resets drawing mode to normal.                         #
-    ##########################################################
     my $self = shift;
 
     $self->{'X'} = 0;
@@ -219,14 +301,19 @@ sub attribute_reset {
     $self->set_b_color({'red' => 0,'green' => 0,'blue' => 0});
     $self->clip_reset;
 }
+=head2 plot
+
+Set a single pixel in the globally set color at position x,y
+with the given pixel size (or default).  Clipping applies.
+
+=over 1
+
+$fb->plot({'x' => 20,'y' => 30, 'pixel_size' => 3});
+
+=back
+
+=cut
 sub plot {
-    ##########################################################
-    ##                         PLOT                         ##
-    ##########################################################
-    # Set a single pixel in the globally set color at        #
-    # position x,y with the given pixel size (or default).   #
-    # Clipping applies.                                      #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -277,13 +364,24 @@ sub plot {
         $self->{'Y'} = $y;
     }
 }
+=head2 drawto
+
+Draws a line, in the global color, from the last plotted
+position to the position x,y.  Clipping applies.
+
+=over 1
+
+ $fb->drawto({
+    'x' => 50,
+    'y' => 60,
+    'pixel_size' => 2
+ });
+
+=back
+
+=cut
 sub drawto {
     ##########################################################
-    ##                        DRAWTO                        ##
-    ##########################################################
-    # Draws a line in the global color from the last plotted #
-    # position to the position x,y.  Clipping applies        #
-    #                                                        #
     # Perfectly horizontal line drawing is optimized by      #
     # using the BLIT functions.  This assists greatly with   #
     # drawing filled objects.  In fact, it's hundreds of     #
@@ -426,31 +524,45 @@ sub drawto {
         $self->plot({'x' => $x_end,'y' => $y_end,'pixel_size' => $size});
     }
 }
+=head2 draw_arc
+
+Draws an arc of a circle at point x,y.
+
+=over 1
+
+ x             = x of center of circle
+ y             = y of center of circle
+ radius        = radius of circle
+ start_degrees = starting point, in degrees, of arc
+ end_degrees   = ending point, in degrees, of arc
+ granularity   = This is used for accuracy in drawing
+                 the arc.  The smaller the number, the
+                 more accurate the arc is drawn, but it
+                 is also slower.  Values between 0.1
+                 and 0.01 are usually good.
+ mode          = Specifies the drawing mode.
+                  0 > arc only
+                  1 > Filled pie section
+                  2 > Poly arc.  Draws a line from x,y to the
+                      beginning and ending arc position.
+
+ $fb->draw_arc({
+    'x'             => 100,
+    'y'             => 100,
+    'radius'        => 100,
+    'start_degrees' => -40,
+    'end_degrees'   => 80,
+    'grandularity   => .05,
+    'mode'          => 2
+ });
+
+=back
+
+=cut
 sub draw_arc {
-    ##########################################################
-    ##                       DRAW ARC                       ##
-    ##########################################################
-    # Draws an arc of a circle at point x,y.                 #
-    #  $x = x of center of circle                            #
-    #  $y = y of center of circle                            #
-    #  $radius = radius of circle                            #
-    #  $start_degrees = starting point, in degrees, of arc   #
-    #  $end_degrees = ending point, in degrees, of arc       #
-    #  $granularity = This is used for accuracy in drawing   #
-    #                 the arc.  The smaller the number, the  #
-    #                 more accurate the arc is drawn, but it #
-    #                 is also slower.  Values between 0.1    #
-    #                 and 0.01 are usually good.             #
-    #  $mode = Specifies the drawing mode.                   #
-    #           0 > arc only                                 #
-    #           1 > Filled pie section                       #
-    #           2 > Poly arc.  Draws a line from x,y to the  #
-    #               beginning and ending arc position.       #
-    ##########################################################
-    # This isn't exactly the fastest routine out there,      #
-    # hence the "granularity" parameter, but it is pretty    #
-    # neat.                                                  #
-    ##########################################################
+    # This isn't exactly the fastest routine out there,
+    # hence the "granularity" parameter, but it is pretty
+    # neat.
     my $self          = shift;
     my $params        = shift;
 
@@ -526,20 +638,32 @@ sub draw_arc {
         $self->drawto({'x' => $sx,'y' => $sy,'pixel_size' => $size});
     }
 }
+=head2 ellipse
+
+Draw an ellipse at center position x,y with XRadius,
+YRadius.  Either a filled out outline is drawn based
+on the value of $filled.  The optional factor value
+varies from the default 1 to change the look and
+nature of the output.  Clipping Applies.
+
+=over 1
+
+ $fb->ellipse({
+    'x'          => 200,
+    'y'          => 250,
+    'xradius'    => 50,
+    'yradius'    => 100,
+    'filled'     => 0,
+    'pixel_size' => 4
+ });
+
+=back
+=cut
+
 sub ellipse {
-    ##########################################################
-    ##                        ELLIPSE                       ##
-    ##########################################################
-    # Draw an ellipse at center position x,y with XRadius,   #
-    # YRadius.  Either a filled out outline is drawn based   #
-    # on the value of $filled.  The optional factor value    #
-    # varies from the default 1 to change the look and       #
-    # nature of the output.  Clipping Applies                #
-    #                                                        #
-    # The routine even works properly for XOR mode when      #
-    # filled ellipses are drawn as well.  This was solved by #
-    # drawing only if the X or Y position changed.           #
-    ##########################################################
+    # The routine even works properly for XOR mode when
+    # filled ellipses are drawn as well.  This was solved by
+    # drawing only if the X or Y position changed.
     my $self    = shift;
     my $params  = shift;
 
@@ -644,12 +768,23 @@ sub ellipse {
         }
     }
 }
+=head2 circle
+
+A wrapper for 'ellipse'.  I generally only needs x,y, and
+radius, but filled and pixel_size are also allowed.
+
+=over 1
+
+ $fb->circle({
+    'x'      => 300,
+    'y'      => 300,
+    'radius' => 100,
+    'filled' => 1,
+ });
+
+=back
+=cut
 sub circle {
-    ##########################################################
-    ##                        CIRCLE                        ##
-    ##########################################################
-    # A wrapper to ELLIPSE it only needs X, Y, and Radius    #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -660,16 +795,24 @@ sub circle {
     my $size   = int($params->{'pixel_size'} || 1);
     $self->ellipse({'x' => $x,'y' => $y,'xradius' => $r,'yradius' => $r,'filled' => $filled,'factor' => 1,'pixel_size' => $size});
 }
+=head2 polygon
+
+Creates an empty polygon drawn in the global color value.  The
+parameter 'coordinates' is an array of x,y values.  The last
+x,y combination is connected automatically with the first to
+close the polygon.  All x,y values are absolute, not relative.
+Clipping applies.
+
+=over 1
+
+ $fb->polygon({
+    'coordinates' => [5,5,23,34,7,7],
+    'pixel_size'  => 4
+ });
+
+=back
+=cut
 sub polygon {
-    ##########################################################
-    ##                        POLYGON                       ##
-    ##########################################################
-    # Creates an empty polygon drawn in the global color     #
-    # value.  An array of x,y values is passed to it.  The   #
-    # last x,y combination is connected automatically with   #
-    # the first to close the polygon.  All x,y values are    #
-    # absolute, not relative.  Clipping applies.             #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -686,36 +829,24 @@ sub polygon {
     $self->drawto({'x' => $xx,'y' => $yy,'pixel_size' => $size});
     $self->plot({'x' => $xx,'y' => $yy,'pixel_size' => $size}) if ($self->{'DRAW_MODE'} == 1);
 }
-sub rbox {
-    ##########################################################
-    ##                         RBOX                         ##
-    ##########################################################
-    # And alternate method to call BOX.  It uses width and   #
-    # height values instead of absolute coordinates for the  #
-    # bottom right corner.                                   #
-    ##########################################################
-    my $self   = shift;
-    my $params = shift;
+=head2 box
 
-    my $x      = int($params->{'x'});
-    my $y      = int($params->{'y'});
-    my $w      = int($params->{'width'});
-    my $h      = int($params->{'height'});
-    my $filled = int($params->{'filled'} || 0);
-    my $size   = int($params->{'pixel_size'} || 1);
-    $size = 1 if ($filled);
-    my $xx = $x + $w;
-    my $yy = $y + $h;
-    $self->box({'x' => $x,'y' => $y,'xx' => $xx,'yy' => $yy,'filled' => $filled,'pixel_size' => $size});
-}
+Draws a box from point x,y to point xx,yy, either as an outline,
+if 'filled' is 0, or as a filled block, if 'filled' is 1.
+
+=over 1
+
+ $fb->box({
+    'x'      => 20,
+    'y'      => 50,
+    'xx'     => 70,
+    'yy'     => 100,
+    'filled' => 1,
+ });
+
+=back
+=cut
 sub box {
-    ##########################################################
-    ##                          BOX                         ##
-    ##########################################################
-    # Draws a box from point x,y to point xx,yy, either as   #
-    # an outline if "filled" is 0 or as a filled block if    #
-    # "filled" is 1.                                         #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -744,19 +875,61 @@ sub box {
         $self->polygon({'pixel_size' => $size,'coordinates' => [$x,$y,$xx,$y,$xx,$yy,$x,$yy]});
     }
 }
-sub set_color {
-    ##########################################################
-    ##                        COLOR                         ##
-    ##########################################################
-    # Returns a compacted string with the 32 bit encoded RGB #
-    # color value passed to it as separate RGB values.       #
-    ##########################################################
+=head2 rbox
+
+Draws a box at point x,y with the width 'width' and height 'height'.
+It draws a frame if 'filled' is 0 or a filled box if 'filled' is 1.
+'pixel_size' only applies if 'filled' is 0.
+
+=over 1
+
+ $fb->rbox({
+    'x' => 100,
+    'y' => 100,
+    'width' => 200,
+    'height' => 150,
+    'filled' => 0,
+    'pixel_size' => 2
+ });
+
+=back
+=cut
+sub rbox {
     my $self   = shift;
     my $params = shift;
 
-    my $R = int($params->{'red'}) & 255;
+    my $x      = int($params->{'x'});
+    my $y      = int($params->{'y'});
+    my $w      = int($params->{'width'});
+    my $h      = int($params->{'height'});
+    my $filled = int($params->{'filled'} || 0);
+    my $size   = int($params->{'pixel_size'} || 1);
+    $size = 1 if ($filled);
+    my $xx = $x + $w;
+    my $yy = $y + $h;
+    $self->box({'x' => $x,'y' => $y,'xx' => $xx,'yy' => $yy,'filled' => $filled,'pixel_size' => $size});
+}
+=head2 set_color
+
+Sets the drawing color in red, green, and blue, absolute values.
+
+=over 1
+
+ $fb->set_color({
+    'red'   => 255,
+    'green' => 255,
+    'blue'  => 0
+ });
+
+=back
+=cut
+sub set_color {
+    my $self   = shift;
+    my $params = shift;
+
+    my $R = int($params->{'red'})   & 255;
     my $G = int($params->{'green'}) & 255;
-    my $B = int($params->{'blue'}) & 255;
+    my $B = int($params->{'blue'})  & 255;
     if ($self->{'BITS'} == 32) {
         $self->{'COLOR'} = chr($B).chr($G).chr($R).chr(255);
     } else {
@@ -768,13 +941,21 @@ sub set_color {
     }
     $self->{'I_COLOR'} = Imager::Color->new($R,$G,$B);
 }
+=head2 set_b_color
+
+Sets the background color in red, green, and blue values.
+
+=over 1
+
+ $fb->set_b_color({
+    'red'   => 0,
+    'green' => 0,
+    'blue'  => 255
+ });
+
+=back
+=cut
 sub set_b_color {
-    ##########################################################
-    ##                  SET BACKGROUND COLOR                ##
-    ##########################################################
-    # Sets the background color to be the Red, Green, and    #
-    # Blue values passed in.                                 #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -791,13 +972,17 @@ sub set_b_color {
         $self->{'B_COLOR'} = pack('S',$self->{'COLOR'});
     }
 }
+=head2 pixel
+
+Returns the color of the pixel at coordinate x,y.
+
+=over 1
+
+ my ($pixel_red,$pixel_green,$pixel_blue) = $fb->pixel({'x' => 20,'y' => 25});
+
+=back
+=cut
 sub pixel {
-    ##########################################################
-    ##                         PIXEL                        ##
-    ##########################################################
-    # Return the Red, Green, and Blue color values of a      #
-    # particular pixel.                                      #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -824,27 +1009,35 @@ sub pixel {
         return({'red' => $R,'green' => $G,'blue' => $B,'raw' => $color});
     }
 }
+=head2 fill
+
+Does a flood fill starting at point x,y.  It samples the color
+at that point and determines that color to be the "background"
+color, and proceeds to fill in, with the current global color,
+until the "backround" color is replaced with the new color.
+Clipping applies.
+
+BECAUSE OF ITS RECURSIVE NATURE, IT CAN CHOW DOWN ON MEMORY
+LIKE IT IS GOING OUT OF STYLE!  Memory is restored when
+complete, but be prepared to see a lot disappear while it is
+running!  This is a stack issue.
+
+=over 1
+
+ $fb->fill({'x' => 334, 'y' => 23});
+
+=back
+=cut
 sub fill {
-    ##########################################################
-    ##                      FLOOD FILL                      ##
-    ##########################################################
-    # Starts at x,y and first samples the color currently    #
-    # active at the point and determines that color to be    #
-    # the background color, and proceeds to fill in with the #
-    # current global color until the background is replaced  #
-    # with the new color or a different color is found.      #
-    # Clipping applies.  THIS CAN CHOW DOWN ON MEMORY UNTIL  #
-    # IT FINISHES, DUE TO ITS RECURSIVE NATURE!!             #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
     my $x = int($params->{'x'});
     my $y = int($params->{'y'});
     my ($BR,$BG,$BB,$back) = $self->pixel({'x' => $x,'y' => $y});
-    $self->flood({'x' => $x,'y' => $y,'background' => $back}) if ($back ne $self->{'COLOR'});
+    $self->_flood({'x' => $x,'y' => $y,'background' => $back}) if ($back ne $self->{'COLOR'});
 }
-sub flood {
+sub _flood {
     ##########################################################
     ##                         FLOOD                        ##
     ##########################################################
@@ -867,15 +1060,25 @@ sub flood {
         $self->flood({'x' => $x-1,'y' => $y,'background' => $back});
     }
 }
+=head2 replace_color
+
+This replaces one color with another inside the clipping
+region.  Sort of like a fill without boundary checking.
+
+=over 1
+
+ $fb->replace_color({
+    'old_red'   => 23,
+    'old_green' => 48,
+    'old_blue'  => 98,
+    'new_red'   => 255,
+    'new_green' => 255,
+    'new_blue'  => 0
+ });
+
+=back
+=cut
 sub replace_color {
-    ##########################################################
-    ##                    REPLACE COLOR                     ##
-    ##########################################################
-    # This handy routine replaces one color with another     #
-    # within the entire screen region.  The old RGB values   #
-    # are passed along with the new in that order.  Clipping #
-    # is in the experimental stage right now                 #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -908,13 +1111,25 @@ sub replace_color {
     }
     $self->{'DRAW_MODE'} = $old_mode;
 }
+=head2 blit_copy
+
+Copies a square portion of screen graphic data from x,y,w,h
+to x_dest,y_dest.  It copies in the current drawing mode.
+
+=over 1
+
+ $fb->blit_copy({
+    'x'      => 20,
+    'y'      => 20,
+    'width'  => 30,
+    'height' => 30,
+    'x_dest' => 200,
+    'y_dest' => 200
+ });
+
+=back
+=cut
 sub blit_copy {
-    ##########################################################
-    ##                       BLIT COPY                      ##
-    ##########################################################
-    # COPIES A SQUARE OF GRAPHIC DATA FROM X,Y,W,H TO XX,YY  #
-    # IT COPIES IN THE CURRENT DRAWING MODE                  #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -925,16 +1140,26 @@ sub blit_copy {
     my $xx = int($params->{'x_dest'});
     my $yy = int($params->{'y_dest'});
 
-#    set_info($self->{'FBINFO_HWACCEL_COPYAREA'},$self->{'FBinfo_hwaccel_copyarea'},$self->{'FB'},$xx,$yy,$w,$h,$x,$y);
+#    _set_info($self->{'FBINFO_HWACCEL_COPYAREA'},$self->{'FBinfo_hwaccel_copyarea'},$self->{'FB'},$xx,$yy,$w,$h,$x,$y);
     $self->blit_write({'x' => $xx,'y' => $yy,%{$self->blit_read({'x' => $x,'y' => $y,'width' => $w,'height' => $h})}});
 }
+=head2 blit_read
+
+Reads in a square portion of screen data at x,y,width,height,
+and returns the block of raw data as a string.
+
+=over 1
+
+ my $blit_data = $fb->blit_read({
+    'x'      => 30,
+    'y'      => 50,
+    'width'  => 100,
+    'height' => 100
+ });
+
+=back
+=cut
 sub blit_read {
-    ##########################################################
-    ##                       BLIT READ                      ##
-    ##########################################################
-    # Reads in a block of screen data at x,y,w,h and returns #
-    # the block of raw data.                                 #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -959,13 +1184,23 @@ sub blit_read {
 
     return({'width' => $w,'height' => $h,'image' => $scrn});
 }
+=head2 blit_write
+
+Writes a previously read block of screen data at x,y,width,height.
+
+=over 1
+
+ $fb->blit_write({
+    'x'      => 0,
+    'y'      => 0,
+    'width'  => 100,
+    'height' => 100,
+    'image'  => $blit_data
+ });
+
+=back
+=cut
 sub blit_write {
-    ##########################################################
-    ##                       BLIT WRITE                     ##
-    ##########################################################
-    # Writes a previously read block of screen data at xx,yy #
-    # w,h.                                                   #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -1062,12 +1297,18 @@ sub blit_write {
         }
     }
 }
+=head2 clip_reset
+
+Turns off clipping, and resets the clipping values to the full
+size of the screen.
+
+=over 1
+
+ $fb->clip_reset();
+
+=back
+=cut
 sub clip_reset {
-    ##########################################################
-    ##                       CLIP RESET                     ##
-    ##########################################################
-    # Resets graphics clipping to the full screen            #
-    ##########################################################
     my $self = shift;
 
     $self->{'X_CLIP'}  = 0;
@@ -1076,23 +1317,24 @@ sub clip_reset {
     $self->{'YY_CLIP'} = ($self->{'YRES'} - 1);
     $self->{'CLIPPED'} = 0;
 }
-sub clip_rset {
-    my $self   = shift;
-    my $params = shift;
-    my $x = int($params->{'x'});
-    my $y = int($params->{'y'});
-    my $w = int($params->{'width'});
-    my $h = int($params->{'height'});
 
-    $self->clip_set({'x' => $x,'y' => $y,'xx' => ($x + $w),'yy' => ($y + $h)});
-}
+=head2 clip_set
+
+Sets the clipping rectangle starting at the top left point x,y
+and ending at bottom right point xx,yy.
+
+=over 1
+
+ $fb->clip_set({
+    'x' => 10,
+    'y' => 10,
+    'xx' => 300,
+    'yy' => 300
+ });
+
+=back
+=cut
 sub clip_set {
-    ##########################################################
-    ##                        CLIP SET                      ##
-    ##########################################################
-    # Sets the clipping rectangle at top left origin X,Y to  #
-    # bottom right location XX,YY.                           #
-    ##########################################################
     my $self   = shift;
     my $params = shift;
 
@@ -1107,13 +1349,39 @@ sub clip_set {
     $self->{'YY_CLIP'} = ($self->{'YRES'} - 1) if ($self->{'YY_CLIP'} >= $self->{'YRES'});
     $self->{'CLIPPED'} = 1;
 }
+=head2 clip_rset
+
+Sets the clipping rectangle to point x,y,width,height
+
+=over 1
+
+ $fb->clip_rset({
+    'x'      => 10,
+    'y'      => 10,
+    'width'  => 600,
+    'height' => 400
+ });
+
+=back
+=cut
+sub clip_rset {
+    my $self   = shift;
+    my $params = shift;
+    my $x = int($params->{'x'});
+    my $y = int($params->{'y'});
+    my $w = int($params->{'width'});
+    my $h = int($params->{'height'});
+
+    $self->clip_set({'x' => $x,'y' => $y,'xx' => ($x + $w),'yy' => ($y + $h)});
+}
+=head2 ttf_print
+
+Prints TrueType text on the screen at point x,y in the rectangle width,height,
+using the color 'color', and the face 'face'.
+
+This is best called twice, first in bounding box mode, and then in normal mode.
+=cut
 sub ttf_print {
-    ##############################################################################
-    ##                           TRUE-TYPE FONT PRINT                           ##
-    ##############################################################################
-    # This prints on the screen, a string passed to it in a True Type font.      #
-    # The X, Y, Height, and Color are also passed to it.                         #
-    #                                                                            #
     # This uses the 'Imager' package.  It allocates a temporary screen buffer    #
     # and prints to it, then this buffer is dumped to the screen at the x,y      #
     # coordinates given.  Since no decent True Type packages or libraries are    #
@@ -1198,6 +1466,11 @@ sub ttf_print {
     print STDERR $@ if ($@);
     return({'x' => $TTF_x,'y' => $TTF_y-$TTF_h,'width' => $TTF_w,'height' => ($TTF_h + $global_ascent) - $global_descent});
 }
+=head2 get_face_name
+
+Returns the TrueType face name based on the parameters passed.
+It uses the exact same parameters as the ttf_print method.
+=cut
 sub get_face_name {
     my $self   = shift;
     my $params = shift;
@@ -1206,6 +1479,12 @@ sub get_face_name {
     my $face_name = eval($face->face_name());
     return($face_name);
 }
+=head2 load_image
+
+Loads an image at point x,y[,width,height]
+
+If 'width' and/or 'height' is given, the image is resized
+=cut
 sub load_image {
     my $self   = shift;
     my $params = shift;
@@ -1262,7 +1541,7 @@ sub load_image {
         'datachannels'  => 4,
         'storechannels' => 4,
         'data'          => \$data
-    );
+   );
 
     my ($x,$y);
     if (defined($params->{'x'}) && defined($params->{'y'})) {
@@ -1293,6 +1572,10 @@ sub load_image {
            }
     );
 }
+=head2 screen_dump
+
+Dumps the screen to a file given in 'file'.  This is a RAW dump.
+=cut
 sub screen_dump {
     ##############################################################################
     ##                            Dump Screen To File                           ##
@@ -1309,6 +1592,10 @@ sub screen_dump {
     print $DUMP $dump;
     close($DUMP);
 }
+=head2 RGB_to_16
+
+Converts 24 bit color values to 16 bit color values.
+=cut
 sub RGB_to_16 {
     ##############################################################################
     ##                               RGB to 16 Bit                              ##
@@ -1333,6 +1620,10 @@ sub RGB_to_16 {
     }
     return({'color' => $n_data});
 }
+=head2 RGBA_to_16
+
+Converts 32 bit color values to 16 bit
+=cut
 sub RGBA_to_16 {
     my $self   = shift;
     my $params = shift;
@@ -1352,6 +1643,10 @@ sub RGBA_to_16 {
     }
     return({'color' => $n_data});
 }
+=head2 RGB_to_RGBA
+
+Converts 24 bit color to 32 bit color
+=cut
 sub RGB_to_RGBA {
     my $self   = shift;
     my $params = shift;
@@ -1369,12 +1664,11 @@ sub RGB_to_RGBA {
 
 ## Not objects nor methods, just standard flat subroutines
 
-sub get_info {
+sub _get_info {
     ##########################################################
     ##                    GET IOCTL INFO                    ##
     ##########################################################
     # Used to return an array specific to the ioctl function #
-    # NOTE:  It is not object oriented                       #
     ##########################################################
     my $command = shift;
     my $format  = shift;
@@ -1385,12 +1679,11 @@ sub get_info {
     @array = unpack($format,$data);
     return(@array);
 }
-sub set_info {
+sub _set_info {
     ##########################################################
     ##                    GET IOCTL INFO                    ##
     ##########################################################
     # Used to call or set ioctl specific functions           #
-    # NOTE:  It is not object oriented                       #
     ##########################################################
     my $command = shift;
     my $format  = shift;
@@ -1404,42 +1697,6 @@ sub set_info {
 
 __END__
   
-=pod
-
-=head1 NAME
-
-Graphics::Framebuffer
-
-=head1 SYNOPSIS
-
- use Graphics::Framebuffer;
-
- my $fb = Graphics::Framebuffer->new();
-
- $fb->cls();
- $fb->set_color({'red' => 255, 'green' => 255, 'blue' => 255});
- $fb->plot({'x' => 28, 'y' => 79,'pixel_size' => 1});
- $fb->drawto({'x' => 405,'y' => 681,'pixel_size' => 1});
- $fb->circle({'x' => 200, 'y' => 200, 'radius' => 100, 'filled' => 1});
-
- $fb->close_screen();
-
-=head1 DESCRIPTION
-
-A (mostly) Pure Perl graphics library for exclusive use in a console framebuffer
-environment.  It is written for simplicity without the need for complex API's
-and drivers.
-
-Back in the old days, computers drew graphics this way, and it was simple and
-easy to do.  I was writing a console based media playing program, and was not
-satisfied with the limited abilities offered by the Curses library, and I did
-not want the overhead of the X environment to get in the way.  My intention
-was to create a mobile media server.  In case you are wondering, that project
-has been quite successful, and I am still making improvements to it.
-
-There are places where Pure Perl just won't cut it.  So I use the Imager
-library to take up the slack.  It's just used to load and save images, and
-draw TrueType text.
 
 =head1 AUTHOR
 
@@ -1452,7 +1709,7 @@ modify it under the same terms as Perl itself.
 
 =head1 VERSION
 
-Version 4.04 (March 20, 2014)
+Version 4.05 (March 20, 2014)
 
 =cut
 

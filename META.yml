@@ -25,4 +25,4 @@ requires:
   perl: 5.14.0
 resources:
   license: http://dev.perl.org/licenses/
-version: 4.03
+version: 4.05

@@ -8,4 +8,8 @@ Revision history for Graphics-Framebuffer
         Public CPAN release.  This is considerably more advanced
 		than the one distributed as part of the media player.
 
+4.03    March 20, 2014
+        Minor changes to the CPAN package
 
+4.05    April 14, 2014
+        Documentation updates.  POD section revamped.
