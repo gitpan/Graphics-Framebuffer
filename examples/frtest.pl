@@ -23,6 +23,9 @@ foreach my $page (1..$Threads) {
     threads->create(
         sub {
             my $Page = shift;
+            if (defined($framebuffer[$Page]->{'ERROR'})) {
+                print STDERR "Thread $Page, $framebuffer[$Page]->{'ERROR'}\n";
+            }
             while(1) {
                 attract($Page);
             }
