@@ -14,10 +14,19 @@ Revision history for Graphics-Framebuffer
 4.05    April 14, 2014
         Documentation updates.  POD section revamped.
 
-4.06    July 29, 2014
+4.06    July 19, 2014
         Added better testing
         
         Added framebuffer emulation mode for test running on systems
         without a hardware framebuffer.  It draws to a 640x480x32
         virtual screen in memory.  You can dump this screen to a file.
         
+4.07    July 23, 2014
+        Fixed calculation error in string size allocation for emulation
+        mode.
+        
+        Fixed fill 'flood' typo.
+        
+        Fixed pixel class documentation.  It was incorrect.
+
+        Added more tests for most used classes.

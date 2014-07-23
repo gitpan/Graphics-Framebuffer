@@ -3,13 +3,19 @@ examples/frtest.pl
 ignore.txt
 lib/Graphics/Framebuffer.pm
 Makefile.PL
-MANIFEST
+MANIFEST			This list of files
 README
 t/00-load.t
 t/01-init.t
-t/boilerplate.t
-t/manifest.t
-t/pod-coverage.t
-t/pod.t
+t/02-plot.t
+t/03-drawto.t
+t/04-circle.t
+t/05-box.t
+t/06-polygon.t
+t/07-pixel.t
+t/100-boilerplate.t
+t/101-manifest.t
+t/102-pod.t
+t/103-pod-coverage.t
 META.yml                                 Module YAML meta-data (added by MakeMaker)
 META.json                                Module JSON meta-data (added by MakeMaker)

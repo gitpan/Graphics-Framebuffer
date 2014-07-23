@@ -60,7 +60,7 @@ BEGIN {
     require Exporter;
 
     # set the version for version checking
-    our $VERSION   = 4.06;
+    our $VERSION   = 4.07;
     our @ISA       = qw(Exporter);
     our @EXPORT    = qw();
     our @EXPORT_OK = qw();
@@ -180,8 +180,8 @@ sub new {
         # Now that everything is set up, let's map the framebuffer to SCREEN
         mmap($self->{'SCREEN'}, $self->{'smem_len'}, PROT_READ | PROT_WRITE, MAP_SHARED, $self->{'FB'});
     } else {    # Go into emulation mode if no actual framebuffer available
-        $self->{'ERROR'}          = 'Framebuffer Device Not Found! Emulation mode.';
-        $self->{'SCREEN'}         = chr(0) x ($self->{'VXRES'} x $self->{'VYRES'} x $self->{'BYTES'});
+        $self->{'ERROR'}          = 'Framebuffer Device Not Found! Emulation mode.  EXPERIMENTAL!!';
+        $self->{'SCREEN'}         = chr(0) x ($self->{'VXRES'} * $self->{'VYRES'} * $self->{'BYTES'});
         $self->{'XRES'}           = $self->{'VXRES'};
         $self->{'YRES'}           = $self->{'VYRES'};
         $self->{'PIXELS'}         = (($self->{'XOFFSET'} + $self->{'VXRES'}) * ($self->{'YOFFSET'} + $self->{'VYRES'}));
@@ -1022,7 +1022,16 @@ Returns the color of the pixel at coordinate x,y.
 
 =over 1
 
- my ($pixel_red,$pixel_green,$pixel_blue) = $fb->pixel({'x' => 20,'y' => 25});
+ my $pixel = $fb->pixel({'x' => 20,'y' => 25});
+
+ # $pixel is a hash reference in the form:
+ #
+ # {
+ #    'red'   => integer value, # 0 - 255
+ #    'green' => integer value, # 0 - 255
+ #    'blue'  => integer value, # 0 - 255
+ #    'raw'   => 32bit value
+ # }
 
 =back
 =cut
@@ -1102,10 +1111,10 @@ sub _flood {
     my ($r, $g, $b, $f_color) = $self->pixel({'x' => $x, 'y' => $y});
     if (($x >= $self->{'X_CLIP'}) && ($x <= $self->{'XX_CLIP'}) && ($y >= $self->{'Y_CLIP'}) && ($y <= $self->{'YY_CLIP'}) && ($f_color eq $back)) {
         $self->plot({'x' => $x, 'y' => $y, 'pixel_size' => 1});
-        $self->flood({'x' => $x,     'y' => $y + 1, 'background' => $back});
-        $self->flood({'x' => $x,     'y' => $y - 1, 'background' => $back});
-        $self->flood({'x' => $x + 1, 'y' => $y,     'background' => $back});
-        $self->flood({'x' => $x - 1, 'y' => $y,     'background' => $back});
+        $self->_flood({'x' => $x,     'y' => $y + 1, 'background' => $back});
+        $self->_flood({'x' => $x,     'y' => $y - 1, 'background' => $back});
+        $self->_flood({'x' => $x + 1, 'y' => $y,     'background' => $back});
+        $self->_flood({'x' => $x - 1, 'y' => $y,     'background' => $back});
     }
 } ## end sub _flood
 
@@ -1761,7 +1770,7 @@ modify it under the same terms as Perl itself.
 
 =head1 VERSION
 
-Version 4.06 (July 19, 2014)
+Version 4.07 (July 23, 2014)
 
 =cut
 

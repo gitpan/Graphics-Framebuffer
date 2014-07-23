@@ -7,3 +7,4 @@ use Graphics::Framebuffer;
 
 my $fb = Graphics::Framebuffer->new();
 isa_ok($fb, 'Graphics::Framebuffer');
+
