@@ -30,3 +30,7 @@ Revision history for Graphics-Framebuffer
         Fixed pixel class documentation.  It was incorrect.
 
         Added more tests for most used classes.
+
+4.08    July 25, 2014
+        Added additional information to the documentation for the new
+        emulation mode.  No actual code changes made.

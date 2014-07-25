@@ -46,11 +46,25 @@ console only graphics library.
 I highly suggest you use 32 bit mode and avoid 16 bit, as it has been a long time
 since I tested it on a 16 bit graphics mode.
 
+NOTE:
+
+If a framebuffer is not available, the module will go into emulation
+mode and open a pseudo-screen in the object's hash variable 'SCREEN'
+
+You can write this to a file, whatever.  It defaults to a 640x480x32
+graphics 'buffer'.  However, you can change that by passing parameters
+to the 'new' method.
+
+You will not be able to see the output directly when in emulation
+mode.  I mainly created this mode so that you could install this
+module and test code you may be writing to be used on other devices
+that have accessible framebuffer devices.
+
 =cut
 
 use strict;
 no strict 'vars';
-use 5.014;
+use 5.010;
 use Switch;    # Yes, a touch of new Perl.
 use Math::Trig qw(:pi);
 use Sys::Mmap;    # Absolutely necessary to map the screen to a string.
@@ -60,7 +74,7 @@ BEGIN {
     require Exporter;
 
     # set the version for version checking
-    our $VERSION   = 4.07;
+    our $VERSION   = 4.08;
     our @ISA       = qw(Exporter);
     our @EXPORT    = qw();
     our @EXPORT_OK = qw();
@@ -210,7 +224,7 @@ $fb->screen_close();
 
 sub screen_close {
     my $self = shift;
-    if (!defined($self->{'ERROR'})) {
+    if (!defined($self->{'ERROR'})) { # Only do it if not in emulation mode
         munmap($self->{'SCREEN'}) if (defined($self->{'SCREEN'}));
         close($self->{'FB'}) if (defined($self->{'FB'}));
         delete($self->{'FB'});
@@ -1111,6 +1125,7 @@ sub _flood {
     my ($r, $g, $b, $f_color) = $self->pixel({'x' => $x, 'y' => $y});
     if (($x >= $self->{'X_CLIP'}) && ($x <= $self->{'XX_CLIP'}) && ($y >= $self->{'Y_CLIP'}) && ($y <= $self->{'YY_CLIP'}) && ($f_color eq $back)) {
         $self->plot({'x' => $x, 'y' => $y, 'pixel_size' => 1});
+        # WEEEE!  Let's chow down on stack memory!!
         $self->_flood({'x' => $x,     'y' => $y + 1, 'background' => $back});
         $self->_flood({'x' => $x,     'y' => $y - 1, 'background' => $back});
         $self->_flood({'x' => $x + 1, 'y' => $y,     'background' => $back});
@@ -1770,7 +1785,7 @@ modify it under the same terms as Perl itself.
 
 =head1 VERSION
 
-Version 4.07 (July 23, 2014)
+Version 4.08 (July 25, 2014)
 
 =cut
 
