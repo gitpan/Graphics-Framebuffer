@@ -34,3 +34,11 @@ Revision history for Graphics-Framebuffer
 4.08    July 25, 2014
         Added additional information to the documentation for the new
         emulation mode.  No actual code changes made.
+
+4.09    November 26, 2014
+        Added more FBIOCTL flags to make ready for future hardware
+        accellerated updates.  No promises here, but heck, this
+        entire module was an exercise in "can it be done in Perl?"
+        
+        Also fixed a code comment that was mislabeled.
+

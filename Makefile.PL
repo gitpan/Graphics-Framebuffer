@@ -13,13 +13,14 @@ WriteMakefile(
     MIN_PERL_VERSION   => 5.014,
     CONFIGURE_REQUIRES => {
         'ExtUtils::MakeMaker' => 0,
-        'Switch'              => 0,
-        'Math::Trig'          => 0,
-        'Sys::Mmap'           => 0,
-        'Imager'              => 0,
     },
     BUILD_REQUIRES => {'Test::More' => 0,},
-    PREREQ_PM      => {},
+    PREREQ_PM      => {
+        'Switch'     => 0,
+        'Math::Trig' => 0,
+        'Sys::Mmap'  => 0,
+        'Imager'     => 0,
+    },
     dist  => {COMPRESS => 'gzip -9f', SUFFIX => 'gz',},
     clean => {FILES    => 'Graphics-Framebuffer-*'},
 );

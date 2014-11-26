@@ -74,7 +74,7 @@ BEGIN {
     require Exporter;
 
     # set the version for version checking
-    our $VERSION   = 4.08;
+    our $VERSION   = 4.09;
     our @ISA       = qw(Exporter);
     our @EXPORT    = qw();
     our @EXPORT_OK = qw();
@@ -149,17 +149,30 @@ sub new {
         'MASK_MODE'   => 4,
         'CLIPPED'     => 0,
 
-        # Set up the Framebuffer driver "constants" defaults
+        ## Set up the Framebuffer driver "constants" defaults
+        # Commands
         'FBIOGET_VSCREENINFO'      => 0x4600,
+        'FBIOPUT_VSCRRENINFO'      => 0x4601,
         'FBIOGET_FSCREENINFO'      => 0x4602,
-        'FBINFO_HWACCEL_COPYAREA'  => 0x0100,            # I have never been able to get these
-        'FBINFO_HWACCEL_FILLRECT'  => 0x0200,            # three HWACCEL ioctls to work
-        'FBINFO_HWACCEL_IMAGEBLIT' => 0x0400,            #
+        'FBIOGETCMAP'              => 0x4604,
+        'FBIOPUTCMAP'              => 0x4605,
+        'FBIOPAN_DISPLAY'          => 0x4606,
+        # FLAGS
+        'FBINFO_HWACCEL_COPYAREA'  => 0x0100,
+        'FBINFO_HWACCEL_FILLRECT'  => 0x0200,
+        'FBINFO_HWACCEL_IMAGEBLIT' => 0x0400,
+        'FBINFO_HWACCEL_ROTATE'    => 0x1000,
+        'FBINFO_HWACCEL_XPAN'      => 0x2000,
+        'FBINFO_HWACCEL_YPAN'      => 0x4000,
+        # Structure Definitions
         'FBioget_vscreeninfo'      => 'I24',
         'FBioget_fscreeninfo'      => 'A16LI4S3ILI2S',
-        'FBinfo_hwaccel_copyarea'  => 'I6',
-        'FBinfo_hwaccel_fillrect'  => 'I6',
-        'FBinfo_hwaccel_imageblit' => 'I6C1I2',
+        'FBinfo_hwaccel_copyarea'  => 'I6',     # dx(32),dy(32),width(32),height(32),sx(32),sy(32)
+        'FBinfo_hwaccel_fillrect'  => 'I6',     # dx(32),dy(32),width(32),height(32),color(32),rop(32)
+        'FBinfo_hwaccel_imageblit' => 'I6C1I2', # dx(32),dy(32),width(32),height(32),fg_color(32),bg_color(32),depth(8),image pointer(32),color map pointer(32)
+                                                # COLOR MAP:
+                                                #  start(32),length(32),red(16),green(16),blue(16),alpha(16)
+        # Default values
         'VXRES'                    => 640,
         'VYRES'                    => 480,
         'BITS'                     => 32,
@@ -1216,7 +1229,6 @@ sub blit_copy {
     my $xx = int($params->{'x_dest'});
     my $yy = int($params->{'y_dest'});
 
-    #    _set_info($self->{'FBINFO_HWACCEL_COPYAREA'},$self->{'FBinfo_hwaccel_copyarea'},$self->{'FB'},$xx,$yy,$w,$h,$x,$y);
     $self->blit_write({'x' => $xx, 'y' => $yy, %{$self->blit_read({'x' => $x, 'y' => $y, 'width' => $w, 'height' => $h})}});
 }
 
@@ -1757,7 +1769,7 @@ sub _get_info {
 
 sub _set_info {
     ##########################################################
-    ##                    GET IOCTL INFO                    ##
+    ##                    SET IOCTL INFO                    ##
     ##########################################################
     # Used to call or set ioctl specific functions           #
     ##########################################################
@@ -1785,7 +1797,7 @@ modify it under the same terms as Perl itself.
 
 =head1 VERSION
 
-Version 4.08 (July 25, 2014)
+Version 4.09 (November 26, 2014)
 
 =cut
 
